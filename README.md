@@ -117,12 +117,20 @@ cp .env.example .env
 /image-gen                 # 6. 生成视觉素材图片 → 3-素材/
 ```
 
+## 效果展示
+
+![](samples/image1.png)
+![](samples/image2.png)
+![](samples/image3.png)
+![](samples/image4.png)
+![](samples/image6.png)
+![](samples/image7.png)
+![](samples/image8.png)
+![](samples/image9.png)
+
+
 ## 依赖
 
 - **Claude Code** — 驱动整个流水线的 AI 引擎
 - **Doubao Seedream** — AI 图片生成（通过 `.env` 配置）
 
-## 详细文档
-
-- [CLAUDE.md](CLAUDE.md) — 项目结构与约定
-- [新手使用指南.md](新手使用指南.md) — 环境安装与配置教程
