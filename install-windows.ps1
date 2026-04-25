@@ -163,7 +163,7 @@ if ([string]::IsNullOrWhiteSpace($apiKey)) {
     $settingsContent = @"
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "http://175.27.225.233/",
+    "ANTHROPIC_BASE_URL": "https://new-api.apiforce.com.cn/",
     "ANTHROPIC_AUTH_TOKEN": "$apiKey",
     "ANTHROPIC_MODEL": "claude-opus-4-6",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-4-6",
@@ -226,7 +226,7 @@ Write-Host @"
   "claudeCode.preferredLocation": "panel",
   "claudeCode.selectedModel": "claude-opus-4-6",
   "claudeCode.environmentVariables": [
-    {"name": "ANTHROPIC_BASE_URL", "value": "http://175.27.225.233/"},
+    {"name": "ANTHROPIC_BASE_URL", "value": "https://new-api.apiforce.com.cn/"},
     {"name": "ANTHROPIC_AUTH_TOKEN", "value": "$apiKey"},
     {"name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "claude-opus-4-6"},
     {"name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": "claude-opus-4-6"},
