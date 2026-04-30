@@ -48,7 +48,11 @@ export async function generateImage(
     n: args.n,
   };
 
-  console.log(`Generating image (${model})...`, { size });
+  console.log(`Generating image (${model})...`, { size, timeout: `${args.timeout}s` });
+
+  const controller = new AbortController();
+  const timeoutMs = args.timeout * 1000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const res = await fetch(`${baseUrl}/v1/images/generations`, {
     method: "POST",
@@ -57,7 +61,8 @@ export async function generateImage(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeoutId));
 
   if (!res.ok) {
     const err = await res.text();
@@ -139,7 +144,11 @@ export async function editImage(
 
   const url = `${baseUrl}/v1/images/edits`;
 
-  console.log(`Editing image (${model})...`, { size, refs: args.referenceImages.length });
+  console.log(`Editing image (${model})...`, { size, refs: args.referenceImages.length, timeout: `${args.timeout}s` });
+
+  const controller = new AbortController();
+  const timeoutMs = args.timeout * 1000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const res = await fetch(url, {
     method: "POST",
@@ -148,7 +157,8 @@ export async function editImage(
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeoutId));
 
   if (!res.ok) {
     const err = await res.text();

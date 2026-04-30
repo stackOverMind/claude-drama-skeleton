@@ -17,6 +17,7 @@ Options:
   --quality normal|2k       Quality preset (default: 2k)
   --ref <files...>          Reference images for image-to-image editing
   --n <count>               Number of images (default: 1)
+  --timeout <seconds>       Request timeout (default: 300)
   --json                    JSON output
   -h, --help                Show help
 
@@ -38,6 +39,7 @@ function parseArgs(argv: string[]): CliArgs {
     quality: null,
     referenceImages: [],
     n: 1,
+    timeout: 300,
     json: false,
     help: false,
   };
@@ -115,6 +117,14 @@ function parseArgs(argv: string[]): CliArgs {
       if (!v) throw new Error("Missing value for --n");
       out.n = parseInt(v, 10);
       if (isNaN(out.n) || out.n < 1) throw new Error(`Invalid count: ${v}`);
+      continue;
+    }
+
+    if (a === "--timeout") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value for --timeout");
+      out.timeout = parseInt(v, 10);
+      if (isNaN(out.timeout) || out.timeout < 1) throw new Error(`Invalid timeout: ${v}`);
       continue;
     }
 

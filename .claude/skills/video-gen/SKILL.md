@@ -58,41 +58,6 @@ npx -y bun ${SKILL_DIR}/scripts/main.ts download task_xxxxxxxx --video cat-piano
 # Output: /path/to/cat-piano.mp4
 ```
 
-### One-Shot Mode (Legacy)
-
-For quick tests, use `run` (or omit command) to submit, poll, and download in one go:
-
-```bash
-# Basic text-to-video
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "一只猫在花园里弹钢琴" --video cat-piano.mp4
-
-# Image-to-video
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "让猫动起来" --video cat-move.mp4 --image cat.jpg
-
-# With duration and aspect ratio
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "风景延时摄影" --video landscape.mp4 --duration 5 --ar 16:9
-
-# Multiple reference images
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "角色一致性动画" --video char.mp4 --image char1.jpg --image char2.jpg
-
-# Video-to-video (reference video)
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "风格转换" --video styled.mp4 --ref-video source.mp4
-
-# Audio-to-video (reference audio)
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "配合音乐节奏" --video synced.mp4 --ref-audio music.mp3
-
-# From prompt files
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --promptfiles scene.md --video output.mp4
-
-# Specific model
-npx -y bun ${SKILL_DIR}/scripts/main.ts run --prompt "一只狗在奔跑" --video dog.mp4 --model doubao-seedance-2-0-260128
-
-# new-api version
-npx -y bun ${SKILL_DIR}/scripts/main_new_api.ts run --prompt "日落海边" --video sunset.mp4 --json
-```
-
-**Note**: `main_new_api.ts` only supports `--image` (single image), not `--ref-video` or `--ref-audio`.
-
 ## Commands
 
 | Command | Description |
@@ -100,7 +65,6 @@ npx -y bun ${SKILL_DIR}/scripts/main_new_api.ts run --prompt "日落海边" --vi
 | `submit` | Submit task, return `task_id` immediately |
 | `status <task_id>` | Query task status |
 | `download <task_id>` | Download video (only when `status == succeeded`) |
-| `run` | One-shot: submit + poll + download (default) |
 
 ## Options
 

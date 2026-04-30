@@ -408,7 +408,7 @@ async function submitTask(
   if (args.imagePaths.length > 0) {
     body.image = await resolveImageUrl(args.imagePaths[0]);
   }
-  if (args.duration !== null) body.duration = args.duration;
+  if (args.duration !== null) body.seconds = String(args.duration);
   if (args.width !== null) body.width = args.width;
   if (args.height !== null) body.height = args.height;
   if (args.fps !== null) body.fps = args.fps;

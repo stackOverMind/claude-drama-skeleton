@@ -10,6 +10,7 @@ export type CliArgs = {
   quality: Quality | null;
   referenceImages: string[];
   n: number;
+  timeout: number;
   json: boolean;
   help: boolean;
 };

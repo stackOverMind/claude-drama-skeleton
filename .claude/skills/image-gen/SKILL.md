@@ -61,6 +61,7 @@ npx -y bun ${SKILL_DIR}/scripts/main.ts --prompt "一只猫" --image out.png --j
 | `--quality normal\|2k` | Quality preset (default: 2k) |
 | `--ref <files...>` | Reference images for image-to-image editing |
 | `--n <count>` | Number of images (default: 1) |
+| `--timeout <seconds>` | Request timeout (default: 300) |
 | `--json` | JSON output |
 
 ## Generation Mode
