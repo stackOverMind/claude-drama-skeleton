@@ -1,3 +1,5 @@
+export type Provider = "newapi" | "cool";
+
 export type Quality = "normal" | "2k";
 
 export type CliArgs = {
@@ -13,10 +15,17 @@ export type CliArgs = {
   timeout: number;
   json: boolean;
   help: boolean;
+  provider: Provider | null;
 };
 
 export type EnvConfig = {
   baseUrl: string;
   apiKey: string;
   model: string;
+};
+
+export type ImageProvider = {
+  buildConfig(): EnvConfig;
+  generateImage(prompt: string, model: string, args: CliArgs, config: EnvConfig): Promise<Uint8Array>;
+  editImage(prompt: string, model: string, args: CliArgs, config: EnvConfig): Promise<Uint8Array>;
 };

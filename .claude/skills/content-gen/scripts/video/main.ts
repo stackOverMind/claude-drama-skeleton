@@ -1,26 +1,36 @@
 import path from "node:path";
 import process from "node:process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import type { CliArgs, EnvConfig, NewApiQueryResponse, QueryResponse, TaskStatus } from "./types";
+import { mkdir, writeFile } from "node:fs/promises";
+import type { CliArgs, EnvConfig, Provider, VideoProvider } from "./types";
+import { loadEnv } from "../common/env";
+import { readPromptFromStdin } from "../common/prompt";
+import { normalizeOutputPath } from "../common/path-utils";
 
 function printUsage(): void {
   console.log(`Usage:
   # Step 1: Submit task (returns task_id immediately)
-  npx -y bun scripts/main_new_api.ts submit --prompt "一只猫在花园里弹钢琴" [--image cat.jpg]
+  npx -y bun scripts/video/main.ts submit --prompt "一只猫在花园里弹钢琴" [--image cat.jpg] [--ref-video source.mp4]
 
   # Step 2: Check task status
-  npx -y bun scripts/main_new_api.ts status <task_id>
+  npx -y bun scripts/video/main.ts status <task_id>
 
   # Step 3: Download video when status is SUCCESS
-  npx -y bun scripts/main_new_api.ts download <task_id> --video output.mp4
+  npx -y bun scripts/video/main.ts download <task_id> --video output.mp4
 
   # One-shot mode (legacy): submit + poll + download
-  npx -y bun scripts/main_new_api.ts run --prompt "一只猫在花园里弹钢琴" --video cat-piano.mp4
+  npx -y bun scripts/video/main.ts run --prompt "一只猫在花园里弹钢琴" --video cat-piano.mp4
+
+Provider Selection:
+  --provider <name>         volcengine, newapi, or cool (default: auto-detect)
+                            volcengine: uses ARK_API_KEY, calls ark.cn-beijing.volces.com
+                            newapi: uses NEW_API_BASE_URL + API_KEY, OpenAI-compatible
+                            cool: uses COOL_API_KEY, calls Cool API gateway
 
 Submit Options:
   -p, --prompt <text>       Prompt text
-  --promptfiles <files...>  Read prompt from files (concatenated)
-  --image <path>            Input image for image-to-video
+  --image <path>            Input image(s) for image-to-video (can be used multiple times)
+  --ref-video <path>        Reference video for video-to-video
+  --ref-audio <path>        Reference audio for audio-to-video
   -m, --model <id>          Model ID (default: from .env)
   --duration <seconds>      Video duration (default: 5)
   --width <pixels>          Video width
@@ -47,19 +57,25 @@ Download Options:
   --video <path>            Output video path (required)
 
 Run Options (one-shot):
-  Same as submit + --video <path> + --poll-interval + --max-wait`);
+  Same as submit + --video <path> + --poll-interval + --max-wait
+
+Configuration:
+  Reads from project .env file:
+    ARK_API_KEY              VolcEngine API key (for volcengine provider)
+    NEW_API_BASE_URL         API base URL (for newapi provider)
+    API_KEY                  API key (for newapi provider)
+    DEFAULT_VIDEO_GEN_MODEL  Model ID`);
 }
 
 function printSubmitUsage(): void {
   console.log(`Usage:
-  npx -y bun scripts/main_new_api.ts submit --prompt "text" [--image img.jpg] [options]
-
-  npx -y bun scripts/main_new_api.ts submit --promptfiles prompt.md [options]
+  npx -y bun scripts/video/main.ts submit --prompt "text" [--image img.jpg] [--ref-video vid.mp4] [--ref-audio aud.mp3] [options]
 
 Options:
   -p, --prompt <text>       Prompt text
-  --promptfiles <files...>  Read prompt from files
-  --image <path>            Input image
+  --image <path>            Input image(s)
+  --ref-video <path>        Reference video
+  --ref-audio <path>        Reference audio
   -m, --model <id>          Model ID
   --duration <seconds>      Video duration
   --width <pixels>          Video width
@@ -81,17 +97,19 @@ Options:
 
 function printStatusUsage(): void {
   console.log(`Usage:
-  npx -y bun scripts/main_new_api.ts status <task_id> [--json]`);
+  npx -y bun scripts/video/main.ts status <task_id> [--json]`);
 }
 
 function printDownloadUsage(): void {
   console.log(`Usage:
-  npx -y bun scripts/main_new_api.ts download <task_id> --video <path> [--json]`);
+  npx -y bun scripts/video/main.ts download <task_id> --video <path> [--poll-interval N] [--max-wait N]
+
+  Polls task status until succeeded, then downloads the video.`);
 }
 
 function printRunUsage(): void {
   console.log(`Usage:
-  npx -y bun scripts/main_new_api.ts run --prompt "text" --video output.mp4 [options]
+  npx -y bun scripts/video/main.ts run --prompt "text" --video output.mp4 [options]
 
 Options: same as submit, plus:
   --poll-interval <seconds> Task status poll interval (default: 10)
@@ -101,8 +119,7 @@ Options: same as submit, plus:
 function parseArgs(argv: string[]): { command: string; args: CliArgs; taskId: string | null } {
   const out: CliArgs = {
     prompt: null,
-    promptFiles: [],
-    videoPath: null,
+videoPath: null,
     imagePaths: [],
     videoPaths: [],
     audioPaths: [],
@@ -126,17 +143,18 @@ function parseArgs(argv: string[]): { command: string; args: CliArgs; taskId: st
     help: false,
     pollInterval: 10,
     maxWait: 1800,
+    provider: null,
   };
 
   let command = "run";
   let taskId: string | null = null;
 
-  if (argv.length > 0) {
-    const first = argv[0]!;
-    if (first === "submit" || first === "status" || first === "download" || first === "run") {
-      command = first;
-      argv = argv.slice(1);
-    }
+  // Find command in argv (may not be at index 0 if --provider precedes it)
+  const commands = ["submit", "status", "download", "run"];
+  const cmdIdx = argv.findIndex((a) => commands.includes(a));
+  if (cmdIdx >= 0) {
+    command = argv[cmdIdx]!;
+    argv = [...argv.slice(0, cmdIdx), ...argv.slice(cmdIdx + 1)];
   }
 
   for (let i = 0; i < argv.length; i++) {
@@ -150,20 +168,18 @@ function parseArgs(argv: string[]): { command: string; args: CliArgs; taskId: st
     if (a === "--return-last-frame") { out.returnLastFrame = true; continue; }
     if (a === "--draft") { out.draft = true; continue; }
 
+    if (a === "--provider") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value for --provider");
+      if (v !== "volcengine" && v !== "newapi" && v !== "cool") throw new Error(`Invalid provider: ${v}. Use volcengine, newapi, or cool.`);
+      out.provider = v;
+      continue;
+    }
+
     if (a === "--prompt" || a === "-p") {
       const v = argv[++i];
       if (!v) throw new Error(`Missing value for ${a}`);
       out.prompt = v;
-      continue;
-    }
-
-    if (a === "--promptfiles") {
-      const items: string[] = [];
-      let j = i + 1;
-      while (j < argv.length && !argv[j]!.startsWith("-")) { items.push(argv[j]!); j++; }
-      if (items.length === 0) throw new Error("Missing files for --promptfiles");
-      out.promptFiles.push(...items);
-      i = j - 1;
       continue;
     }
 
@@ -178,6 +194,20 @@ function parseArgs(argv: string[]): { command: string; args: CliArgs; taskId: st
       const v = argv[++i];
       if (!v) throw new Error("Missing value for --image");
       out.imagePaths.push(v);
+      continue;
+    }
+
+    if (a === "--ref-video") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value for --ref-video");
+      out.videoPaths.push(v);
+      continue;
+    }
+
+    if (a === "--ref-audio") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value for --ref-audio");
+      out.audioPaths.push(v);
       continue;
     }
 
@@ -294,233 +324,35 @@ function parseArgs(argv: string[]): { command: string; args: CliArgs; taskId: st
   return { command, args: out, taskId };
 }
 
-async function loadEnvFile(p: string): Promise<Record<string, string>> {
-  try {
-    const content = await readFile(p, "utf8");
-    const env: Record<string, string> = {};
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const idx = trimmed.indexOf("=");
-      if (idx === -1) continue;
-      const key = trimmed.slice(0, idx).trim();
-      let val = trimmed.slice(idx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      env[key] = val;
-    }
-    return env;
-  } catch {
-    return {};
+async function detectProvider(): Promise<Provider> {
+  if (process.env.COOL_API_KEY) return "cool";
+  if (process.env.ARK_API_KEY) return "volcengine";
+  return "newapi";
+}
+
+async function loadProvider(name: Provider): Promise<VideoProvider> {
+  if (name === "volcengine") {
+    const mod = await import("./providers/volcengine");
+    return mod.volcengineProvider;
   }
-}
-
-async function loadEnv(): Promise<void> {
-  const cwd = process.cwd();
-  const cwdEnv = await loadEnvFile(path.join(cwd, ".env"));
-  for (const [k, v] of Object.entries(cwdEnv)) {
-    if (!process.env[k]) process.env[k] = v;
+  if (name === "cool") {
+    const mod = await import("./providers/cool");
+    return mod.coolProvider;
   }
-}
-
-function buildConfig(): EnvConfig {
-  const baseUrl = process.env.NEW_API_BASE_URL;
-  const apiKey = process.env.API_KEY;
-  const model = process.env.DEFAULT_VIDEO_GEN_MODEL;
-
-  if (!baseUrl) throw new Error("NEW_API_BASE_URL is required in .env");
-  if (!apiKey) throw new Error("API_KEY is required in .env");
-  if (!model) throw new Error("DEFAULT_VIDEO_GEN_MODEL is required in .env");
-
-  return { baseUrl, apiKey, model };
-}
-
-async function readPromptFromFiles(files: string[]): Promise<string> {
-  const parts: string[] = [];
-  for (const f of files) {
-    parts.push(await readFile(f, "utf8"));
-  }
-  return parts.join("\n\n");
-}
-
-async function readPromptFromStdin(): Promise<string | null> {
-  if (process.stdin.isTTY) return null;
-  try {
-    const t = await Bun.stdin.text();
-    const v = t.trim();
-    return v.length > 0 ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeOutputVideoPath(p: string): string {
-  const full = path.resolve(p);
-  const ext = path.extname(full);
-  if (ext) return full;
-  return `${full}.mp4`;
-}
-
-function getMimeType(filename: string): string {
-  const ext = path.extname(filename).toLowerCase();
-  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
-  if (ext === ".webp") return "image/webp";
-  if (ext === ".gif") return "image/gif";
-  if (ext === ".png") return "image/png";
-  return "application/octet-stream";
-}
-
-async function fileToDataUrl(filePath: string): Promise<string> {
-  const fullPath = path.resolve(filePath);
-  const bytes = await readFile(fullPath);
-  const mimeType = getMimeType(filePath);
-  const b64 = Buffer.from(bytes).toString("base64");
-  return `data:${mimeType};base64,${b64}`;
-}
-
-function isUrl(str: string): boolean {
-  return str.startsWith("http://") || str.startsWith("https://");
-}
-
-async function resolveImageUrl(filePath: string): Promise<string> {
-  if (isUrl(filePath)) return filePath;
-  return fileToDataUrl(filePath);
+  const mod = await import("./providers/newapi");
+  return mod.newapiProvider;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function submitTask(
-  prompt: string,
-  model: string,
-  args: CliArgs,
-  config: EnvConfig,
-): Promise<string> {
-  const baseUrl = config.baseUrl.replace(/\/+$/, "");
-
-  const body: Record<string, unknown> = {
-    model,
-    prompt,
-  };
-
-  if (args.imagePaths.length > 0) {
-    body.image = await resolveImageUrl(args.imagePaths[0]);
-  }
-  if (args.duration !== null) body.seconds = String(args.duration);
-  if (args.width !== null) body.width = args.width;
-  if (args.height !== null) body.height = args.height;
-  if (args.fps !== null) body.fps = args.fps;
-  if (args.seed !== null) body.seed = args.seed;
-  if (args.n > 1) body.n = args.n;
-
-  const metadata: Record<string, unknown> = {};
-  if (args.resolution) metadata.resolution = args.resolution;
-  if (args.aspectRatio) metadata.ratio = args.aspectRatio;
-  if (args.cameraFixed) metadata.camera_fixed = true;
-  if (args.watermark) metadata.watermark = true;
-  if (args.generateAudio) metadata.generate_audio = true;
-  if (args.returnLastFrame) metadata.return_last_frame = true;
-  if (args.serviceTier) metadata.service_tier = args.serviceTier;
-  if (args.draft) metadata.draft = true;
-  if (args.frames !== null) metadata.frames = args.frames;
-
-  if (Object.keys(metadata).length > 0) {
-    body.metadata = metadata;
-  }
-
-  console.log(`Submitting video task (${model})...`);
-
-  const res = await fetch(`${baseUrl}/v1/video/generations`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API error (${res.status}): ${err}`);
-  }
-
-  const result = await res.json() as { task_id: string; status: TaskStatus };
-  if (!result.task_id) throw new Error("No task_id in response");
-
-  return result.task_id;
-}
-
-function mapNewApiStatus(status: string): TaskStatus {
-  if (status === "SUCCESS" || status === "succeeded") return "succeeded";
-  if (status === "FAILED" || status === "failed") return "failed";
-  if (status === "PENDING" || status === "pending" || status === "queued") return "pending";
-  return "processing";
-}
-
-async function queryTask(
-  taskId: string,
-  config: EnvConfig,
-): Promise<QueryResponse> {
-  const baseUrl = config.baseUrl.replace(/\/+$/, "");
-
-  const res = await fetch(`${baseUrl}/v1/video/generations/${taskId}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Query error (${res.status}): ${err}`);
-  }
-
-  const wrapper = await res.json() as NewApiQueryResponse;
-  const data = wrapper.data;
-
-  // Map new-api wrapped response to QueryResponse
-  const result: QueryResponse = {
-    task_id: taskId,
-    status: mapNewApiStatus(data.status),
-  };
-
-  if (data.result_url) {
-    result.url = data.result_url;
-  }
-
-  if (data.data) {
-    const inner = data.data;
-    if (inner.content?.video_url && !result.url) {
-      result.url = inner.content.video_url;
-    }
-    result.metadata = {
-      duration: inner.duration,
-      fps: inner.framespersecond,
-      seed: inner.seed,
-    };
-  }
-
-  if (data.fail_reason) {
-    result.error = { code: "failed", message: data.fail_reason };
-  }
-
-  return result;
-}
-
-async function downloadVideo(url: string): Promise<Uint8Array> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
-  const buf = await res.arrayBuffer();
-  return new Uint8Array(buf);
-}
-
 async function pollTask(
   taskId: string,
   args: CliArgs,
+  provider: VideoProvider,
   config: EnvConfig,
-): Promise<{ url: string; metadata?: QueryResponse["metadata"] }> {
+): Promise<{ url: string; metadata?: import("./types").QueryResponse["metadata"] }> {
   const startTime = Date.now();
   const maxWaitMs = args.maxWait * 1000;
   const pollIntervalMs = args.pollInterval * 1000;
@@ -531,7 +363,7 @@ async function pollTask(
       throw new Error(`Task timeout after ${args.maxWait}s. Task ID: ${taskId}`);
     }
 
-    const result = await queryTask(taskId, config);
+    const result = await provider.queryTask(taskId, config);
 
     if (result.status === "succeeded") {
       if (!result.url) throw new Error("Task succeeded but no URL returned");
@@ -551,9 +383,15 @@ async function pollTask(
   }
 }
 
-async function doSubmit(args: CliArgs, config: EnvConfig): Promise<void> {
+async function downloadVideo(url: string): Promise<Uint8Array> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
+  const buf = await res.arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+async function doSubmit(args: CliArgs, provider: VideoProvider, config: EnvConfig): Promise<void> {
   let prompt: string | null = args.prompt;
-  if (!prompt && args.promptFiles.length > 0) prompt = await readPromptFromFiles(args.promptFiles);
   if (!prompt) prompt = await readPromptFromStdin();
 
   if (!prompt) {
@@ -569,7 +407,7 @@ async function doSubmit(args: CliArgs, config: EnvConfig): Promise<void> {
   let retried = false;
   while (true) {
     try {
-      taskId = await submitTask(prompt, model, args, config);
+      taskId = await provider.submitTask(prompt, model, args, config);
       break;
     } catch (e) {
       if (!retried) {
@@ -588,8 +426,8 @@ async function doSubmit(args: CliArgs, config: EnvConfig): Promise<void> {
   }
 }
 
-async function doStatus(taskId: string, args: CliArgs, config: EnvConfig): Promise<void> {
-  const result = await queryTask(taskId, config);
+async function doStatus(taskId: string, args: CliArgs, provider: VideoProvider, config: EnvConfig): Promise<void> {
+  const result = await provider.queryTask(taskId, config);
 
   if (args.json) {
     console.log(JSON.stringify({
@@ -616,7 +454,7 @@ async function doStatus(taskId: string, args: CliArgs, config: EnvConfig): Promi
   }
 }
 
-async function doDownload(taskId: string, args: CliArgs, config: EnvConfig): Promise<void> {
+async function doDownload(taskId: string, args: CliArgs, provider: VideoProvider, config: EnvConfig): Promise<void> {
   if (!args.videoPath) {
     console.error("Error: --video is required");
     printDownloadUsage();
@@ -624,21 +462,9 @@ async function doDownload(taskId: string, args: CliArgs, config: EnvConfig): Pro
     return;
   }
 
-  const result = await queryTask(taskId, config);
+  const result = await pollTask(taskId, args, provider, config);
 
-  if (result.status !== "succeeded") {
-    console.error(`Error: Task status is "${result.status}", cannot download. Wait until status is "succeeded"."`);
-    process.exitCode = 1;
-    return;
-  }
-
-  if (!result.url) {
-    console.error("Error: Task succeeded but no URL returned");
-    process.exitCode = 1;
-    return;
-  }
-
-  const outputPath = normalizeOutputVideoPath(args.videoPath);
+  const outputPath = normalizeOutputPath(args.videoPath, ".mp4");
   console.log("Downloading video...");
   const videoData = await downloadVideo(result.url);
 
@@ -657,9 +483,8 @@ async function doDownload(taskId: string, args: CliArgs, config: EnvConfig): Pro
   }
 }
 
-async function doRun(args: CliArgs, config: EnvConfig): Promise<void> {
+async function doRun(args: CliArgs, provider: VideoProvider, config: EnvConfig): Promise<void> {
   let prompt: string | null = args.prompt;
-  if (!prompt && args.promptFiles.length > 0) prompt = await readPromptFromFiles(args.promptFiles);
   if (!prompt) prompt = await readPromptFromStdin();
 
   if (!prompt) {
@@ -677,13 +502,13 @@ async function doRun(args: CliArgs, config: EnvConfig): Promise<void> {
   }
 
   const model = args.model || config.model;
-  const outputPath = normalizeOutputVideoPath(args.videoPath);
+  const outputPath = normalizeOutputPath(args.videoPath, ".mp4");
 
   let taskId: string;
   let retried = false;
   while (true) {
     try {
-      taskId = await submitTask(prompt, model, args, config);
+      taskId = await provider.submitTask(prompt, model, args, config);
       break;
     } catch (e) {
       if (!retried) {
@@ -697,7 +522,7 @@ async function doRun(args: CliArgs, config: EnvConfig): Promise<void> {
 
   console.log(`Task submitted: ${taskId}`);
 
-  const result = await pollTask(taskId, args, config);
+  const result = await pollTask(taskId, args, provider, config);
 
   console.log("Downloading video...");
   const videoData = await downloadVideo(result.url);
@@ -728,11 +553,16 @@ async function main(): Promise<void> {
   }
 
   await loadEnv();
-  const config = buildConfig();
+
+  const providerName = args.provider || await detectProvider();
+  console.log(`Using provider: ${providerName}`);
+
+  const provider = await loadProvider(providerName);
+  const config = provider.buildConfig();
 
   switch (command) {
     case "submit":
-      await doSubmit(args, config);
+      await doSubmit(args, provider, config);
       break;
     case "status":
       if (!taskId) {
@@ -741,7 +571,7 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
       }
-      await doStatus(taskId, args, config);
+      await doStatus(taskId, args, provider, config);
       break;
     case "download":
       if (!taskId) {
@@ -750,11 +580,11 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
       }
-      await doDownload(taskId, args, config);
+      await doDownload(taskId, args, provider, config);
       break;
     case "run":
     default:
-      await doRun(args, config);
+      await doRun(args, provider, config);
       break;
   }
 }

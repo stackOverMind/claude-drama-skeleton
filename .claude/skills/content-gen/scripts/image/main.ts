@@ -1,11 +1,19 @@
 import path from "node:path";
 import process from "node:process";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import type { CliArgs, EnvConfig } from "./types";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import type { CliArgs, EnvConfig, ImageProvider, Provider } from "./types";
+import { loadEnv } from "../common/env";
+import { readPromptFromFiles, readPromptFromStdin } from "../common/prompt";
+import { normalizeOutputPath } from "../common/path-utils";
 
 function printUsage(): void {
   console.log(`Usage:
-  npx -y bun scripts/main.ts --prompt "一只猫" --image cat.png
+  npx -y bun scripts/image/main.ts --prompt "一只猫" --image cat.png
+
+Provider Selection:
+  --provider <name>         newapi or cool (default: auto-detect)
+                            newapi: uses NEW_API_BASE_URL + API_KEY
+                            cool: uses COOL_API_KEY, calls Cool API gateway
 
 Options:
   -p, --prompt <text>       Prompt text
@@ -13,18 +21,20 @@ Options:
   --image <path>            Output image path (required)
   -m, --model <id>          Model ID (default: from .env)
   --ar <ratio>              Aspect ratio (e.g., 16:9, 1:1, 4:3)
-  --size <WxH>              Size (e.g., 1024x1024)
-  --quality normal|2k       Quality preset (default: 2k)
+  --size <WxH>              Size (e.g., 1024x1024) (newapi only)
+  --quality normal|2k       Quality preset (default: 2k) (newapi only)
   --ref <files...>          Reference images for image-to-image editing
-  --n <count>               Number of images (default: 1)
+  --n <count>               Number of images (default: 1) (newapi only)
   --timeout <seconds>       Request timeout (default: 300)
   --json                    JSON output
   -h, --help                Show help
 
 Configuration:
   Reads from project .env file:
-    NEW_API_BASE_URL         API base URL
-    API_KEY                  API key
+    NEW_API_BASE_URL         API base URL (newapi)
+    API_KEY                  API key (newapi)
+    COOL_API_KEY             Cool API key (cool)
+    COOL_BASE_URL            Cool base URL (cool, default: https://api.mjapi.cc.cd)
     DEFAULT_IMAGE_GEN_MODEL  Model ID`);
 }
 
@@ -42,6 +52,7 @@ function parseArgs(argv: string[]): CliArgs {
     timeout: 300,
     json: false,
     help: false,
+    provider: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -49,6 +60,14 @@ function parseArgs(argv: string[]): CliArgs {
 
     if (a === "--help" || a === "-h") { out.help = true; continue; }
     if (a === "--json") { out.json = true; continue; }
+
+    if (a === "--provider") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value for --provider");
+      if (v !== "newapi" && v !== "cool") throw new Error(`Invalid provider: ${v}. Use newapi or cool.`);
+      out.provider = v;
+      continue;
+    }
 
     if (a === "--prompt" || a === "-p") {
       const v = argv[++i];
@@ -136,75 +155,18 @@ function parseArgs(argv: string[]): CliArgs {
   return out;
 }
 
-async function loadEnvFile(p: string): Promise<Record<string, string>> {
-  try {
-    const content = await readFile(p, "utf8");
-    const env: Record<string, string> = {};
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const idx = trimmed.indexOf("=");
-      if (idx === -1) continue;
-      const key = trimmed.slice(0, idx).trim();
-      let val = trimmed.slice(idx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      env[key] = val;
-    }
-    return env;
-  } catch {
-    return {};
+async function detectProvider(): Promise<Provider> {
+  if (process.env.COOL_API_KEY) return "cool";
+  return "newapi";
+}
+
+async function loadProvider(name: Provider): Promise<ImageProvider> {
+  if (name === "cool") {
+    const mod = await import("./providers/cool");
+    return { buildConfig: mod.buildConfig, generateImage: mod.generateImage, editImage: mod.editImage };
   }
-}
-
-async function loadEnv(): Promise<void> {
-  const cwd = process.cwd();
-
-  // Load from project root .env
-  const cwdEnv = await loadEnvFile(path.join(cwd, ".env"));
-
-  for (const [k, v] of Object.entries(cwdEnv)) {
-    if (!process.env[k]) process.env[k] = v;
-  }
-}
-
-function buildConfig(): EnvConfig {
-  const baseUrl = process.env.NEW_API_BASE_URL;
-  const apiKey = process.env.API_KEY;
-  const model = process.env.DEFAULT_IMAGE_GEN_MODEL;
-
-  if (!baseUrl) throw new Error("NEW_API_BASE_URL is required in .env");
-  if (!apiKey) throw new Error("API_KEY is required in .env");
-  if (!model) throw new Error("DEFAULT_IMAGE_GEN_MODEL is required in .env");
-
-  return { baseUrl, apiKey, model };
-}
-
-async function readPromptFromFiles(files: string[]): Promise<string> {
-  const parts: string[] = [];
-  for (const f of files) {
-    parts.push(await readFile(f, "utf8"));
-  }
-  return parts.join("\n\n");
-}
-
-async function readPromptFromStdin(): Promise<string | null> {
-  if (process.stdin.isTTY) return null;
-  try {
-    const t = await Bun.stdin.text();
-    const v = t.trim();
-    return v.length > 0 ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeOutputImagePath(p: string): string {
-  const full = path.resolve(p);
-  const ext = path.extname(full);
-  if (ext) return full;
-  return `${full}.png`;
+  const mod = await import("./providers/newapi");
+  return { buildConfig: mod.buildConfig, generateImage: mod.generateImage, editImage: mod.editImage };
 }
 
 async function main(): Promise<void> {
@@ -216,7 +178,12 @@ async function main(): Promise<void> {
   }
 
   await loadEnv();
-  const config = buildConfig();
+
+  const providerName = args.provider || await detectProvider();
+  console.log(`Using provider: ${providerName}`);
+
+  const provider = await loadProvider(providerName);
+  const config = provider.buildConfig();
 
   if (!args.quality) args.quality = "2k";
 
@@ -239,7 +206,7 @@ async function main(): Promise<void> {
   }
 
   const model = args.model || config.model;
-  const outputPath = normalizeOutputImagePath(args.imagePath);
+  const outputPath = normalizeOutputPath(args.imagePath, ".png");
 
   for (const refPath of args.referenceImages) {
     const fullPath = path.resolve(refPath);
@@ -252,17 +219,15 @@ async function main(): Promise<void> {
     }
   }
 
-  const { generateImage, editImage } = await import("./providers/doubao");
-
   let imageData: Uint8Array;
   let retried = false;
 
   while (true) {
     try {
       if (args.referenceImages.length > 0) {
-        imageData = await editImage(prompt, model, args, config);
+        imageData = await provider.editImage(prompt, model, args, config);
       } else {
-        imageData = await generateImage(prompt, model, args, config);
+        imageData = await provider.generateImage(prompt, model, args, config);
       }
       break;
     } catch (e) {

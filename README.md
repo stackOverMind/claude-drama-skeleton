@@ -70,14 +70,13 @@ cp .env.example .env
 | Skill | 触发方式 | 对应阶段 | 功能 |
 |-------|---------|---------|------|
 | **script-analyzer** | `/script-analyzer` | 剧本 → 素材 | 从剧本提取角色、场景、道具，生成定妆照描述和 AI 提示词，自动创建素材目录 |
-| **image-gen** | `/image-gen` | 素材 | AI 图片生成。调用 Doubao Seedream API，支持文生图、图生图、多比例、多质量预设 |
+| **content-gen** | `/content-gen` | 素材+视频 | AI 内容生成（图片+视频）。图片：Doubao Seedream，文生图/图生图；视频：Doubao Seedance，文生视频/图生视频/视频延长 |
 | **seedance-prompt** | `/seedance-prompt` | 视频提示词 | 专业的 Seedance 2.0 视频提示词生成器，支持时间戳分镜、多模态引用、超长视频分段策略 |
 
 ### 音视频生成
 
 | Skill | 触发方式 | 对应阶段 | 功能 |
 |-------|---------|---------|------|
-| **video-gen** | `/video-gen` | 视频 | AI 视频生成。调用 Doubao Seedance API，支持文生视频、图生视频、视频延长，异步三步工作流 |
 | **tts** | `/tts` | 音频 | AI 语音合成。基于小米 MiMo TTS，支持预置音色、音色设计、音色复刻，以及视频音频提取 |
 
 ## 典型工作流
@@ -103,10 +102,10 @@ cp .env.example .env
     ↓
 /script-analyzer → /analyze all   # 5. 提取角色/场景/道具 → 3-素材/
     ↓
-/image-gen                 # 6. 生成视觉素材图片 → 3-素材/
+/content-gen                 # 6. 生成视觉素材图片 → 3-素材/
     ↓
 /seedance-prompt           # 7. 生成视频提示词
-/video-gen                 # 8. 生成视频 → 5-视频/
+/content-gen                 # 8. 生成视频 → 5-视频/
     ↓
 /tts                       # 9. 配音合成 → 5-音频/
 ```
@@ -118,10 +117,10 @@ cp .env.example .env
     ↓
 /seedance-storyboard-generator   # 1. 生成脚本+分镜 → 1-脚本/
     ↓
-/image-gen                       # 2. 生成素材图片 → 2-素材/
+/content-gen                       # 2. 生成素材图片 → 2-素材/
     ↓
 /seedance-prompt                 # 3. 生成视频提示词
-/video-gen                       # 4. 生成视频 → 4-视频/
+/content-gen                       # 4. 生成视频 → 4-视频/
     ↓
 /tts                             # 5. 配音合成 → 5-音频/
 ```

@@ -2,10 +2,8 @@
   "permissions": {
     "allow": [
       "Edit",
-      "Bash(npx -y bun /Users/x/workspace/claude-drama-skeleton/.claude/skills/video-gen/scripts/main_new_api.ts run --prompt \"一辆破旧的汽车沿着荒芜的道路缓缓驶向远方，汽车从画面近处向远处行驶，逐渐变小。镜头固定不动，画面稳定。末日废土风格，暗黄色天空，龟裂的地面，沙尘弥漫。电影级画面，超写实风格。\" --image /Users/x/workspace/claude-drama-skeleton/3-素材/场景/9c134126e3d1973c990c8cc8e8de9793_wasteland.jpg --ar 16:9 --duration 5 --video /Users/x/workspace/claude-drama-skeleton/5-视频/汽车驶向远方_废土风.mp4)",
-      "Bash(npx -y bun .claude/skills/tts/scripts/main.ts --text \"Hey there... can you hear me? I'm right here... so close. Just relax... and let my voice wash over you. Everything is going to be okay... just breathe with me...\" --audio 临时/asmr-binaural.wav --mode design --voice \"Young female, extreme close-up with a binaural, ear-to-ear ASMR feel. Audible breathing, subtle swallowing, and soft natural lip sounds. She speaks very slowly, creating a deeply relaxing and immersive experience.\" --style \"Speak extremely slowly and softly, with long pauses between phrases, gentle whispering quality, intimate and calming, as if speaking directly into the listener's ear\" --json)",
+      "Bash(npx *)",
       "Bash(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 教程/第一章_演讲风格.wav)",
-      "Bash(npx -y bun .claude/skills/tts/scripts/main.ts --text \"你用的 AI 视频工具，全是垃圾\" --audio 教程/标题_纯克隆.wav --mode clone --voice \"3-素材/角色/94b22939b6b9afab540879b7678571fd.wav\")"
     ]
   }
 }

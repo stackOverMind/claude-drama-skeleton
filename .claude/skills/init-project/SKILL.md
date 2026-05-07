@@ -172,5 +172,5 @@ metadata:
 - 使用 `.gitkeep` 占位空目录，确保目录结构可被 git 追踪
 - 创建完成后，提示用户可以使用对应的 Skill 开始创作：
   - 小说项目 → `/chinese-novelist`
-  - 漫剧项目 → `/short-drama`（剧本）、`/script-analyzer`（分析）、`/image-gen`（素材）、`/video-gen`（视频）
-  - 单集视频 → `/image-gen`、`/video-gen`、`/tts`
+  - 漫剧项目 → `/short-drama`（剧本）、`/script-analyzer`（分析）、`/content-gen`（素材+视频）
+  - 单集视频 → `/content-gen`、`/tts`

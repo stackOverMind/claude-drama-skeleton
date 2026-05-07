@@ -1,6 +1,19 @@
 import path from "node:path";
+import process from "node:process";
 import { readFile } from "node:fs/promises";
 import type { CliArgs, EnvConfig } from "../types";
+
+export function buildConfig(): EnvConfig {
+  const baseUrl = process.env.NEW_API_BASE_URL;
+  const apiKey = process.env.API_KEY;
+  const model = process.env.DEFAULT_IMAGE_GEN_MODEL;
+
+  if (!baseUrl) throw new Error("NEW_API_BASE_URL is required in .env");
+  if (!apiKey) throw new Error("API_KEY is required in .env");
+  if (!model) throw new Error("DEFAULT_IMAGE_GEN_MODEL is required in .env");
+
+  return { baseUrl, apiKey, model };
+}
 
 function parseAspectRatio(ar: string): { width: number; height: number } | null {
   const match = ar.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
@@ -30,6 +43,32 @@ function getSizeFromAspectRatio(ar: string | null, quality: CliArgs["quality"]):
 
   const h = Math.round(baseSize / ratio);
   return `${baseSize}x${h}`;
+}
+
+function getMimeType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  return "image/png";
+}
+
+async function extractImageBytes(result: { data: Array<{ url?: string; b64_json?: string }> }): Promise<Uint8Array> {
+  const img = result.data[0];
+  if (!img) throw new Error("No image in response");
+
+  if (img.b64_json) {
+    return Uint8Array.from(Buffer.from(img.b64_json, "base64"));
+  }
+
+  if (img.url) {
+    const imgRes = await fetch(img.url);
+    if (!imgRes.ok) throw new Error("Failed to download image");
+    const buf = await imgRes.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+
+  throw new Error("No image data in response");
 }
 
 export async function generateImage(
@@ -73,47 +112,7 @@ export async function generateImage(
     data: Array<{ url?: string; b64_json?: string }>;
   };
 
-  const img = result.data[0];
-  if (!img) throw new Error("No image in response");
-
-  if (img.b64_json) {
-    return Uint8Array.from(Buffer.from(img.b64_json, "base64"));
-  }
-
-  if (img.url) {
-    const imgRes = await fetch(img.url);
-    if (!imgRes.ok) throw new Error("Failed to download image");
-    const buf = await imgRes.arrayBuffer();
-    return new Uint8Array(buf);
-  }
-
-  throw new Error("No image data in response");
-}
-
-function getMimeType(filename: string): string {
-  const ext = path.extname(filename).toLowerCase();
-  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
-  if (ext === ".webp") return "image/webp";
-  if (ext === ".gif") return "image/gif";
-  return "image/png";
-}
-
-async function extractImageBytes(result: { data: Array<{ url?: string; b64_json?: string }> }): Promise<Uint8Array> {
-  const img = result.data[0];
-  if (!img) throw new Error("No image in response");
-
-  if (img.b64_json) {
-    return Uint8Array.from(Buffer.from(img.b64_json, "base64"));
-  }
-
-  if (img.url) {
-    const imgRes = await fetch(img.url);
-    if (!imgRes.ok) throw new Error("Failed to download image");
-    const buf = await imgRes.arrayBuffer();
-    return new Uint8Array(buf);
-  }
-
-  throw new Error("No image data in response");
+  return extractImageBytes(result);
 }
 
 export async function editImage(
@@ -125,7 +124,6 @@ export async function editImage(
   const baseUrl = config.baseUrl.replace(/\/+$/g, "");
   const size = args.size || getSizeFromAspectRatio(args.aspectRatio, args.quality);
 
-  // Encode reference images as base64 data URIs
   const imageUrls: string[] = [];
   for (const refPath of args.referenceImages) {
     const bytes = await readFile(refPath);
