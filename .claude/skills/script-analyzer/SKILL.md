@@ -311,11 +311,19 @@ metadata:
 {根据以上信息生成的英文提示词。包含：人物特征、服装、表情、光影、画面风格。
 格式为逗号分隔的描述短语。}
 
+**图片布局要求（必须包含在提示词中）：**
+- 图片背景为纯白色或透明或底色统一干净，画面中仅包含角色人物，无其他背景元素干扰
+- 生成全身三视图以及一张面部特写
+- 布局要求：最左边占满三分之一的位置是超大面部特写（close-up face shot，占据左侧 1/3 区域，面部细节清晰，能看到五官、表情、肤质）
+- 右边三分之二放正视图（front view，全身站立，正面朝向）、侧视图（side view，全身侧面，展示体型轮廓）、后视图（back view，全身背面，展示发型和服装背面细节）
+- 三视图在右侧 2/3 区域均匀排列，人物比例一致，姿态统一为自然站立
+- 整体为角色设计稿（character design sheet / turnaround reference sheet）风格
+
 ### 负面提示词
-{需要排除的元素，如：low quality, blurry, deformed, extra limbs, watermark}
+{需要排除的元素，如：low quality, blurry, deformed, extra limbs, watermark, busy background, cluttered background, multiple people, text, logo}
 
 ### 建议参数
-- **比例：** {如 3:4（竖版半身像）}
+- **比例：** {如 16:9（宽屏，适合展示三视图+面部特写布局）或 3:2}
 - **风格：** {如 写实 / 动漫 / 水墨，根据剧本题材}
 ```
 

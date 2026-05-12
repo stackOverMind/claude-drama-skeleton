@@ -3,7 +3,7 @@
     "allow": [
       "Edit",
       "Bash(npx *)",
-      "Bash(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 教程/第一章_演讲风格.wav)",
+      "Bash(*)"
     ]
   }
 }
