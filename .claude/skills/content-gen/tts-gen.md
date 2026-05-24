@@ -1,8 +1,3 @@
----
-name: tts
-description: AI text-to-speech using Xiaomi MiMo TTS API. Supports preset voices, voice design via text description, voice cloning from audio samples, and audio extraction from video. Use when user asks to generate speech, voice, audio, TTS, or extract audio from video.
----
-
 # Text-to-Speech (TTS) & Audio Tools
 
 语音合成，基于小米 MiMo TTS API（OpenAI 兼容格式）。支持预置音色、文本设计音色、音色复刻三种模式，以及从视频中提取音频。
@@ -10,9 +5,9 @@ description: AI text-to-speech using Xiaomi MiMo TTS API. Supports preset voices
 ## Script Directory
 
 **Agent Execution**:
-1. `SKILL_DIR` = this SKILL.md file's directory
-2. TTS script = `${SKILL_DIR}/scripts/main.ts`
-3. Audio extraction script = `${SKILL_DIR}/scripts/extract-audio.ts`
+1. `SKILL_DIR` = the `content-gen` SKILL.md file's directory
+2. TTS script = `${SKILL_DIR}/scripts/tts/main.ts`
+3. Audio extraction script = `${SKILL_DIR}/scripts/tts/extract-audio.ts`
 
 ## Configuration
 
@@ -40,16 +35,16 @@ Reads from project root `.env`:
 
 ```bash
 # 基础用法
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "你好，世界！" --audio hello.wav
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "你好，世界！" --audio hello.wav
 
 # 指定音色
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "你好" --audio hello.wav --voice 冰糖
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "你好" --audio hello.wav --voice 冰糖
 
 # 带风格指令
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "终于考过了！" --audio excited.wav --style "轻快上扬的语调，带着压抑不住的激动与小骄傲"
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "终于考过了！" --audio excited.wav --style "轻快上扬的语调，带着压抑不住的激动与小骄傲"
 
 # 音频标签控制
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "(开心)今天天气真好！" --audio happy.wav
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "(开心)今天天气真好！" --audio happy.wav
 ```
 
 ### 音色设计（Voice Design）
@@ -58,7 +53,7 @@ npx -y bun ${SKILL_DIR}/scripts/main.ts --text "(开心)今天天气真好！" -
 
 ```bash
 # 描述音色并合成
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "欢迎来到午夜电台。" --audio radio.wav \
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "欢迎来到午夜电台。" --audio radio.wav \
   --mode design \
   --voice "一位三十多岁的男性，嗓音低沉磁性，语速缓慢，像深夜电台DJ"
 ```
@@ -69,7 +64,7 @@ npx -y bun ${SKILL_DIR}/scripts/main.ts --text "欢迎来到午夜电台。" --a
 
 ```bash
 # 用音频样本复刻音色
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "这是复刻后的声音。" --audio cloned.wav \
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "这是复刻后的声音。" --audio cloned.wav \
   --mode clone \
   --voice sample.mp3
 ```
@@ -78,10 +73,10 @@ npx -y bun ${SKILL_DIR}/scripts/main.ts --text "这是复刻后的声音。" --a
 
 ```bash
 # 从文件读取合成文本
-npx -y bun ${SKILL_DIR}/scripts/main.ts --textfile script.txt --audio output.wav
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --textfile script.txt --audio output.wav
 
 # 从文件读取风格指令
-npx -y bun ${SKILL_DIR}/scripts/main.ts --text "台词内容" --stylefile style.txt --audio output.wav
+npx -y bun ${SKILL_DIR}/scripts/tts/main.ts --text "台词内容" --stylefile style.txt --audio output.wav
 ```
 
 ## Options
@@ -147,13 +142,13 @@ npx -y bun ${SKILL_DIR}/scripts/main.ts --text "台词内容" --stylefile style.
 
 ```bash
 # 提取完整音频为 WAV
-npx -y bun ${SKILL_DIR}/scripts/extract-audio.ts -i video.mp4 -o audio.wav
+npx -y bun ${SKILL_DIR}/scripts/tts/extract-audio.ts -i video.mp4 -o audio.wav
 
 # 提取前 10 秒为 MP3
-npx -y bun ${SKILL_DIR}/scripts/extract-audio.ts -i video.mp4 -o audio.mp3 --duration 10
+npx -y bun ${SKILL_DIR}/scripts/tts/extract-audio.ts -i video.mp4 -o audio.mp3 --duration 10
 
 # 提取片段（1:30 ~ 1:40）为 16kHz 单声道 WAV（适合 voice clone）
-npx -y bun ${SKILL_DIR}/scripts/extract-audio.ts -i video.mp4 -o segment.wav \
+npx -y bun ${SKILL_DIR}/scripts/tts/extract-audio.ts -i video.mp4 -o segment.wav \
   --start 00:01:30 --duration 10 --sample-rate 16000 --channels 1
 ```
 

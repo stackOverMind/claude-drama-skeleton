@@ -1,4 +1,4 @@
-export type Provider = "newapi" | "cool";
+export type Provider = "newapi";
 
 export type Quality = "normal" | "2k";
 

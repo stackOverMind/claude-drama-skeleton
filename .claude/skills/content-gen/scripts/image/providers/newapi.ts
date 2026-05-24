@@ -24,6 +24,10 @@ function parseAspectRatio(ar: string): { width: number; height: number } | null 
   return { width: w, height: h };
 }
 
+function roundToMultipleOf16(n: number): number {
+  return Math.round(n / 16) * 16;
+}
+
 function getSizeFromAspectRatio(ar: string | null, quality: CliArgs["quality"]): string {
   const baseSize = quality === "2k" ? 2048 : 1024;
 
@@ -37,11 +41,11 @@ function getSizeFromAspectRatio(ar: string | null, quality: CliArgs["quality"]):
   if (Math.abs(ratio - 1) < 0.1) return `${baseSize}x${baseSize}`;
 
   if (ratio > 1) {
-    const w = Math.round(baseSize * ratio);
+    const w = roundToMultipleOf16(baseSize * ratio);
     return `${w}x${baseSize}`;
   }
 
-  const h = Math.round(baseSize / ratio);
+  const h = roundToMultipleOf16(baseSize / ratio);
   return `${baseSize}x${h}`;
 }
 
@@ -124,21 +128,18 @@ export async function editImage(
   const baseUrl = config.baseUrl.replace(/\/+$/g, "");
   const size = args.size || getSizeFromAspectRatio(args.aspectRatio, args.quality);
 
-  const imageUrls: string[] = [];
+  const formData = new FormData();
+  formData.append("model", model);
+  formData.append("prompt", prompt);
+  if (size) formData.append("size", size);
+  if (args.n) formData.append("n", String(args.n));
+
   for (const refPath of args.referenceImages) {
     const bytes = await readFile(refPath);
     const mimeType = getMimeType(refPath);
-    const b64 = Buffer.from(bytes).toString("base64");
-    imageUrls.push(`data:${mimeType};base64,${b64}`);
+    const filename = path.basename(refPath);
+    formData.append("image", new Blob([bytes], { type: mimeType }), filename);
   }
-
-  const body: Record<string, unknown> = {
-    model,
-    prompt,
-    size,
-    n: args.n,
-    image: imageUrls.length === 1 ? imageUrls[0] : imageUrls,
-  };
 
   const url = `${baseUrl}/v1/images/edits`;
 
@@ -151,10 +152,9 @@ export async function editImage(
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${config.apiKey}`,
     },
-    body: JSON.stringify(body),
+    body: formData,
     signal: controller.signal,
   }).finally(() => clearTimeout(timeoutId));
 

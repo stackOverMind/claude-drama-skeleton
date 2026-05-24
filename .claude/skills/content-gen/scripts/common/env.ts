@@ -1,6 +1,6 @@
 import path from "node:path";
 import process from "node:process";
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 
 export async function loadEnvFile(p: string): Promise<Record<string, string>> {
   try {
@@ -24,10 +24,27 @@ export async function loadEnvFile(p: string): Promise<Record<string, string>> {
   }
 }
 
+async function findProjectRoot(startDir: string): Promise<string | null> {
+  let dir = path.resolve(startDir);
+  while (true) {
+    try {
+      await access(path.join(dir, ".env"));
+      return dir;
+    } catch {
+      const parent = path.dirname(dir);
+      if (parent === dir) return null;
+      dir = parent;
+    }
+  }
+}
+
 export async function loadEnv(): Promise<void> {
-  const cwd = process.cwd();
-  const cwdEnv = await loadEnvFile(path.join(cwd, ".env"));
-  for (const [k, v] of Object.entries(cwdEnv)) {
+  const projectRoot = await findProjectRoot(process.cwd());
+  const envPath = projectRoot
+    ? path.join(projectRoot, ".env")
+    : path.join(process.cwd(), ".env");
+  const env = await loadEnvFile(envPath);
+  for (const [k, v] of Object.entries(env)) {
     if (!process.env[k]) process.env[k] = v;
   }
 }

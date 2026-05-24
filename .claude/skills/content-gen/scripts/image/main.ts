@@ -1,7 +1,7 @@
 import path from "node:path";
 import process from "node:process";
 import { access, mkdir, writeFile } from "node:fs/promises";
-import type { CliArgs, EnvConfig, ImageProvider, Provider } from "./types";
+import type { CliArgs, ImageProvider, Provider } from "./types";
 import { loadEnv } from "../common/env";
 import { readPromptFromFiles, readPromptFromStdin } from "../common/prompt";
 import { normalizeOutputPath } from "../common/path-utils";
@@ -10,31 +10,24 @@ function printUsage(): void {
   console.log(`Usage:
   npx -y bun scripts/image/main.ts --prompt "一只猫" --image cat.png
 
-Provider Selection:
-  --provider <name>         newapi or cool (default: auto-detect)
-                            newapi: uses NEW_API_BASE_URL + API_KEY
-                            cool: uses COOL_API_KEY, calls Cool API gateway
-
 Options:
   -p, --prompt <text>       Prompt text
   --promptfiles <files...>  Read prompt from files (concatenated)
   --image <path>            Output image path (required)
   -m, --model <id>          Model ID (default: from .env)
   --ar <ratio>              Aspect ratio (e.g., 16:9, 1:1, 4:3)
-  --size <WxH>              Size (e.g., 1024x1024) (newapi only)
-  --quality normal|2k       Quality preset (default: 2k) (newapi only)
+  --size <WxH>              Size (e.g., 1024x1024)
+  --quality normal|2k       Quality preset (default: 2k)
   --ref <files...>          Reference images for image-to-image editing
-  --n <count>               Number of images (default: 1) (newapi only)
+  --n <count>               Number of images (default: 1)
   --timeout <seconds>       Request timeout (default: 300)
   --json                    JSON output
   -h, --help                Show help
 
 Configuration:
   Reads from project .env file:
-    NEW_API_BASE_URL         API base URL (newapi)
-    API_KEY                  API key (newapi)
-    COOL_API_KEY             Cool API key (cool)
-    COOL_BASE_URL            Cool base URL (cool, default: https://api.mjapi.cc.cd)
+    NEW_API_BASE_URL         API base URL
+    API_KEY                  API key
     DEFAULT_IMAGE_GEN_MODEL  Model ID`);
 }
 
@@ -64,7 +57,7 @@ function parseArgs(argv: string[]): CliArgs {
     if (a === "--provider") {
       const v = argv[++i];
       if (!v) throw new Error("Missing value for --provider");
-      if (v !== "newapi" && v !== "cool") throw new Error(`Invalid provider: ${v}. Use newapi or cool.`);
+      if (v !== "newapi") throw new Error(`Invalid provider: ${v}. Only newapi is supported.`);
       out.provider = v;
       continue;
     }
@@ -155,17 +148,8 @@ function parseArgs(argv: string[]): CliArgs {
   return out;
 }
 
-async function detectProvider(): Promise<Provider> {
-  if (process.env.COOL_API_KEY) return "cool";
-  return "newapi";
-}
-
 async function loadProvider(name: Provider): Promise<ImageProvider> {
-  if (name === "cool") {
-    const mod = await import("./providers/cool");
-    return { buildConfig: mod.buildConfig, generateImage: mod.generateImage, editImage: mod.editImage };
-  }
-  const mod = await import("./providers/newapi");
+  const mod = await import(`./providers/${name}`);
   return { buildConfig: mod.buildConfig, generateImage: mod.generateImage, editImage: mod.editImage };
 }
 
@@ -179,9 +163,7 @@ async function main(): Promise<void> {
 
   await loadEnv();
 
-  const providerName = args.provider || await detectProvider();
-  console.log(`Using provider: ${providerName}`);
-
+  const providerName = args.provider || "newapi";
   const provider = await loadProvider(providerName);
   const config = provider.buildConfig();
 
@@ -207,6 +189,16 @@ async function main(): Promise<void> {
 
   const model = args.model || config.model;
   const outputPath = normalizeOutputPath(args.imagePath, ".png");
+
+  // Prevent overwriting existing files
+  try {
+    await access(outputPath);
+    console.error(`Error: Output file already exists: ${outputPath}`);
+    process.exitCode = 1;
+    return;
+  } catch {
+    // File does not exist, safe to proceed
+  }
 
   for (const refPath of args.referenceImages) {
     const fullPath = path.resolve(refPath);

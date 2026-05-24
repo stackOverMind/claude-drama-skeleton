@@ -1,6 +1,6 @@
 # Image Generation
 
-Image generation via multiple providers.
+Image generation via new-api OpenAI-compatible API.
 
 ## Script Directory
 
@@ -8,17 +8,7 @@ Image generation via multiple providers.
 1. `SKILL_DIR` = parent SKILL.md file's directory (content-gen)
 2. Script path = `${SKILL_DIR}/scripts/image/main.ts`
 
-## Provider Selection
-
-Use `--provider` flag to select backend:
-
-- **`--provider newapi`**: new-api OpenAI-compatible API. Uses `NEW_API_BASE_URL` + `API_KEY`. Supports `--size`, `--quality`, `--n`.
-- **`--provider cool`**: Cool API gateway. Uses `COOL_API_KEY`. Supports all Cool image models (gpt_image_2, seedream_4_5, midjourney_v7, flux_kontext_pro, etc.). Async task: submit → poll → download.
-- **Auto-detect** (default): Uses `cool` when `COOL_API_KEY` is set, otherwise `newapi`.
-
 ## Configuration
-
-### newapi (`--provider newapi`)
 
 | Variable | Description |
 |----------|-------------|
@@ -26,22 +16,11 @@ Use `--provider` flag to select backend:
 | `API_KEY` | API key for authentication |
 | `DEFAULT_IMAGE_GEN_MODEL` | Model ID (e.g. `doubao-seedream-5-0-260128`) |
 
-### Cool (`--provider cool`)
-
-| Variable | Description |
-|----------|-------------|
-| `COOL_API_KEY` | Cool API key (Bearer token) |
-| `COOL_BASE_URL` | Cool base URL (default: `https://api.mjapi.cc.cd`) |
-| `DEFAULT_IMAGE_GEN_MODEL` | Model ID (e.g. `gpt_image_2`, `seedream_4_5`, `midjourney_v7`) |
-
 ## Usage
 
 ```bash
-# Basic (text-to-image, auto-detect provider)
+# Basic text-to-image
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只可爱的猫" --image cat.png
-
-# Explicit Cool provider
-npx -y bun ${SKILL_DIR}/scripts/image/main.ts --provider cool --prompt "一只可爱的猫" --image cat.png --model gpt_image_2
 
 # With aspect ratio
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "风景画" --image landscape.png --ar 16:9
@@ -49,8 +28,8 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "风景画" --image lands
 # Image-to-image editing
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "把猫变成赛博朋克风格" --image cyber-cat.png --ref cat.png
 
-# Doubao specific: high quality
-npx -y bun ${SKILL_DIR}/scripts/image/main.ts --provider newapi --prompt "一只猫" --image out.png --quality 2k
+# High quality
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.png --quality 2k
 
 # From prompt files
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts --promptfiles system.md content.md --image out.png
@@ -63,18 +42,112 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.p
 
 | Option | Description |
 |--------|-------------|
-| `--provider <name>` | Backend: `newapi` or `cool` (default: auto-detect) |
 | `--prompt <text>`, `-p` | Prompt text |
 | `--promptfiles <files...>` | Read prompt from files (concatenated) |
 | `--image <path>` | Output image path (required) |
 | `-m, --model <id>` | Model ID (default: from `.env`) |
 | `--ar <ratio>` | Aspect ratio (e.g., `16:9`, `1:1`, `4:3`) |
-| `--size <WxH>` | Size (e.g., `1024x1024`) (newapi only) |
-| `--quality normal\|2k` | Quality preset (default: 2k) (newapi only) |
+| `--size <WxH>` | Size (e.g., `1024x1024`) |
+| `--quality normal\|2k` | Quality preset (default: 2k) |
 | `--ref <files...>` | Reference images for image-to-image editing |
-| `--n <count>` | Number of images (default: 1) (newapi only) |
+| `--n <count>` | Number of images (default: 1) |
 | `--timeout <seconds>` | Request timeout (default: 300) |
 | `--json` | JSON output |
+
+## Grid Generation (九宫格 / 四宫格)
+
+生成角色/场景参考图网格，并自动切割为独立图片。
+
+### 生成九宫格角色参考图
+
+```bash
+# 1. 生成九宫格大图
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
+  --prompt "Create a 3x3 character reference sheet. Grid layout: Row 1: Front view | Side view | Back view. Row 2: Happy | Angry | Sad. Row 3: Surprised | Neutral | Action. Character: a young female warrior with long silver hair, wearing red armor. Style: anime, clean white background, full body in each cell, consistent outfit." \
+  --image 角色/主角/参考图.png --ar 1:1 --quality 2k
+
+# 2. 自动切割为 9 张独立图片
+npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split 角色/主角/参考图.png 角色/主角/ --grid 3x3 --prefix 主角
+# → 输出: 角色/主角/主角_cell_1_1.png ... 主角_cell_3_3.png
+```
+
+### 生成四宫格场景参考图
+
+```bash
+# 1. 生成四宫格大图
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
+  --prompt "Create a 2x2 grid. Row 1: Day view | Night view. Row 2: Wide shot | Close-up. Scene: a medieval castle on a hill. Style: fantasy art, consistent architecture across all cells." \
+  --image 场景/城堡/参考图.png --ar 1:1 --quality 2k
+
+# 2. 自动切割为 4 张独立图片
+npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split 场景/城堡/参考图.png 场景/城堡/ --grid 2x2 --prefix 城堡
+# → 输出: 场景/城堡/城堡_cell_1_1.png ... 城堡_cell_2_2.png
+```
+
+### Grid Prompt 模板
+
+**角色九宫格**：
+
+```
+Create a 3x3 character reference sheet for [角色名].
+Grid layout:
+- Row 1: Front view | Side view | Back view (same neutral pose)
+- Row 2: Happy expression | Angry expression | Sad expression
+- Row 3: Surprised expression | Neutral expression | Action pose
+
+Character details:
+- Appearance: [外貌描述]
+- Outfit: [服装描述]
+- Style: [项目风格]
+
+Requirements:
+- Each cell shows the full body
+- Consistent outfit across all cells
+- Clean white background
+- Only expression, angle, and pose change
+```
+
+**场景九宫格**：
+
+```
+Create a 3x3 scene reference sheet for [场景名].
+Grid layout:
+- Row 1: Wide shot | Medium shot | Close-up detail
+- Row 2: Day lighting | Sunset lighting | Night lighting
+- Row 3: Sunny weather | Cloudy atmosphere | Rainy atmosphere
+
+Scene details:
+- Description: [场景描述]
+- Style: [项目风格]
+
+Requirements:
+- Same location in all cells
+- Consistent architectural elements
+- Only lighting, weather, and camera distance change
+```
+
+### Grid 切割命令
+
+```bash
+# 切割九宫格
+npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split <input.png> <output_dir> --grid 3x3 [--prefix name]
+
+# 切割四宫格
+npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split <input.png> <output_dir> --grid 2x2 [--prefix name]
+```
+
+| Option | Description |
+|--------|-------------|
+| `input` | 输入的网格大图路径 |
+| `output_dir` | 输出目录 |
+| `--grid` | 网格类型：`3x3` 或 `2x2` |
+| `--prefix` | 输出文件名前缀 |
+
+**依赖**：切割功能需要安装 `sharp`（推荐）或 `jimp`：
+
+```bash
+npm install sharp
+```
 
 ## Generation Mode
 
@@ -88,9 +161,73 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.p
 
 如果用户的请求会导致覆盖（例如"基于 v4.png 生成新风格，保存到 v4.png"），**自动改名**：在原文件名后追加风格/版本后缀，如 `刀盾狗-v4.png` → `刀盾狗-v4-雕像.png`，然后告知用户输出的新路径。不要在生成前再追问，直接改名即可。
 
-## Prompt Rules
+## 风格提示词自动注入
 
-### 图生图（带 `--ref`）：只写改动点，不要画蛇添足
+当用户没有明确指定画面风格时，**自动从项目目录的 `项目说明.md` 中读取 `## 画面风格提示词` 字段**，将其追加到 prompt 末尾作为风格锚定。
+
+**读取规则**：
+1. 检测当前工作目录是否在某个 `项目-*/` 下
+2. 查找同级目录中的 `项目说明.md`
+3. 提取 `## 画面风格提示词` 下方的内容（到下一个 `##` 标题前）
+4. 如果该字段存在且非空，则追加到 prompt：`{原始 prompt}，{风格提示词}`
+5. 如果字段为空或不存在，则不加任何风格后缀
+
+**示例**：
+- 项目说明.md 中风格提示词为：`2D 动画风格，细腻手绘质感`
+- 用户 prompt：`一只可爱的猫`
+- 实际提交 prompt：`一只可爱的猫，2D 动画风格，细腻手绘质感`
+
+---
+
+## 生成流程：先写 Prompt MD，后生成
+
+**当用户请求生成图片时，必须先询问用户选择流程：**
+
+1. **先写 Prompt 文件**（推荐）— 用户确认 prompt 后再生成
+2. **直接生成** — 立即执行生成
+
+**默认选择「先写 Prompt 文件」**，让用户有机会审阅和修改。
+
+### Prompt MD 文件模板
+
+如果选择「先写 Prompt 文件」，按以下模板创建 `.md` 文件：
+
+```markdown
+# {画面主题} Prompt
+
+## 参考图
+
+- **图片1**：{描述} `{绝对路径}`
+- **图片2**：{描述} `{绝对路径}`
+（如有多个参考图，按图片1/图片2/...编号）
+
+## 画面内容
+
+{场景描述、主体、动作、环境等}
+
+## 镜头语言
+
+{视角、焦距、构图、景深、光影方向等}
+
+## 风格
+
+{艺术风格、色彩、笔触、氛围等}
+
+## 负面 Prompt
+
+{需要排除的元素}
+```
+
+**必填字段**：参考图（如有）、画面内容、风格
+**可选字段**：镜头语言、负面 Prompt
+
+### 参考图命名规则
+
+Prompt 文件中指代参考图时，**必须按 `--ref` 参数中的提交顺序**，使用"图片1"、"图片2"等，**绝不能出现文件名**。
+
+### Prompt Rules
+
+#### 图生图（带 `--ref`）：只写改动点，不要画蛇添足
 
 当使用 `--ref` 提供参考图时，prompt **只描述需要修改/新增的内容**，不要复述参考图里已有的外观特征（颜色、材质、风格、姿势、构图等）。模型会自己从参考图里提取这些信息，重复描述反而会干扰生成、导致结果偏离参考图。
 
@@ -98,20 +235,21 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.p
 
 **图生图（有 `--ref`）**：只写差异。
 
-示例对比：
+### 生成命令示例
 
 ```bash
-# ❌ 错误：参考图已经是橘色柴犬团子，prompt 又把外观全描述一遍
---prompt "圆滚滚橘黄色柴犬团子，呆萌表情，毛绒质感，叼着刀，夹着金色圆盾，白色背景，3D 卡通风格" --ref ref.png
+# 文生图
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
+  --promptfiles prompt.md \
+  --image output.png \
+  --ar 16:9 --quality 2k
 
-# ✅ 正确：只写要改的动作/场景
---prompt "改成冲锋姿势，举刀向前" --ref ref.png
-
-# ✅ 正确：只写新增元素
---prompt "戴上中世纪头盔" --ref ref.png
-
-# ✅ 正确：只写场景替换
---prompt "背景改为森林战场" --ref ref.png
+# 图生图
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
+  --promptfiles prompt.md \
+  --image output.png \
+  --ref ref1.png ref2.png \
+  --ar 16:9 --quality 2k
 ```
 
 ## Error Handling

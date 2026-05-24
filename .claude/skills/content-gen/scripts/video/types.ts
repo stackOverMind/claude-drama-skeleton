@@ -1,4 +1,4 @@
-export type Provider = "volcengine" | "newapi" | "cool";
+export type Provider = "volcengine" | "newapi";
 
 export type CliArgs = {
   prompt: string | null;

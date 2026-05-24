@@ -21,10 +21,9 @@ function printUsage(): void {
   npx -y bun scripts/video/main.ts run --prompt "一只猫在花园里弹钢琴" --video cat-piano.mp4
 
 Provider Selection:
-  --provider <name>         volcengine, newapi, or cool (default: auto-detect)
+  --provider <name>         volcengine or newapi (default: auto-detect)
                             volcengine: uses ARK_API_KEY, calls ark.cn-beijing.volces.com
                             newapi: uses NEW_API_BASE_URL + API_KEY, OpenAI-compatible
-                            cool: uses COOL_API_KEY, calls Cool API gateway
 
 Submit Options:
   -p, --prompt <text>       Prompt text
@@ -171,7 +170,7 @@ videoPath: null,
     if (a === "--provider") {
       const v = argv[++i];
       if (!v) throw new Error("Missing value for --provider");
-      if (v !== "volcengine" && v !== "newapi" && v !== "cool") throw new Error(`Invalid provider: ${v}. Use volcengine, newapi, or cool.`);
+      if (v !== "volcengine" && v !== "newapi") throw new Error(`Invalid provider: ${v}. Use volcengine or newapi.`);
       out.provider = v;
       continue;
     }
@@ -325,7 +324,6 @@ videoPath: null,
 }
 
 async function detectProvider(): Promise<Provider> {
-  if (process.env.COOL_API_KEY) return "cool";
   if (process.env.ARK_API_KEY) return "volcengine";
   return "newapi";
 }
@@ -334,10 +332,6 @@ async function loadProvider(name: Provider): Promise<VideoProvider> {
   if (name === "volcengine") {
     const mod = await import("./providers/volcengine");
     return mod.volcengineProvider;
-  }
-  if (name === "cool") {
-    const mod = await import("./providers/cool");
-    return mod.coolProvider;
   }
   const mod = await import("./providers/newapi");
   return mod.newapiProvider;
@@ -370,7 +364,7 @@ async function pollTask(
       return { url: result.url, metadata: result.metadata };
     }
 
-    if (result.status === "failed") {
+    if (result.status === "failed" || result.error) {
       const errorMsg = result.error?.message || "Unknown error";
       const errorCode = result.error?.code || "unknown";
       throw new Error(`Task failed (code: ${errorCode}): ${errorMsg}`);
