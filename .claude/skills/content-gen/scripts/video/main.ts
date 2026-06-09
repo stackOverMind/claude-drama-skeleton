@@ -3,13 +3,13 @@ import process from "node:process";
 import { mkdir, writeFile } from "node:fs/promises";
 import type { CliArgs, EnvConfig, Provider, VideoProvider } from "./types";
 import { loadEnv } from "../common/env";
-import { readPromptFromStdin } from "../common/prompt";
+import { readPromptFromStdin, readPromptFromMarkdownFile } from "../common/prompt";
 import { normalizeOutputPath } from "../common/path-utils";
 
 function printUsage(): void {
   console.log(`Usage:
   # Step 1: Submit task (returns task_id immediately)
-  npx -y bun scripts/video/main.ts submit --prompt "一只猫在花园里弹钢琴" [--image cat.jpg] [--ref-video source.mp4]
+  npx -y bun scripts/video/main.ts submit --prompt "一只猫在花园里弹钢琴" [--ref-image cat.jpg] [--ref-video source.mp4]
 
   # Step 2: Check task status
   npx -y bun scripts/video/main.ts status <task_id>
@@ -27,9 +27,10 @@ Provider Selection:
 
 Submit Options:
   -p, --prompt <text>       Prompt text
-  --image <path>            Input image(s) for image-to-video (can be used multiple times)
-  --ref-video <path>        Reference video for video-to-video
-  --ref-audio <path>        Reference audio for audio-to-video
+  --promptfile <path>       Read prompt from markdown file (skips YAML frontmatter)
+  --ref-image <path>        Reference image(s) for video generation (can be used multiple times)
+  --ref-video <path>        Reference video(s) for video-to-video (can be used multiple times)
+  --ref-audio <path>        Reference audio(s) for audio-to-video (can be used multiple times)
   -m, --model <id>          Model ID (default: from .env)
   --duration <seconds>      Video duration (default: 5)
   --width <pixels>          Video width
@@ -40,7 +41,6 @@ Submit Options:
   --resolution <string>     Resolution preset (e.g., 1080p, 720p)
   --camera-fixed            Fixed camera position
   --watermark               Add watermark
-  --generate-audio          Generate audio
   --return-last-frame       Return last frame
   --service-tier <tier>     Service tier
   --draft                   Draft mode
@@ -68,11 +68,12 @@ Configuration:
 
 function printSubmitUsage(): void {
   console.log(`Usage:
-  npx -y bun scripts/video/main.ts submit --prompt "text" [--image img.jpg] [--ref-video vid.mp4] [--ref-audio aud.mp3] [options]
+  npx -y bun scripts/video/main.ts submit --prompt "text" [--ref-image img.jpg] [--ref-video vid.mp4] [--ref-audio aud.mp3] [options]
 
 Options:
   -p, --prompt <text>       Prompt text
-  --image <path>            Input image(s)
+  --promptfile <path>       Read prompt from markdown file (skips YAML frontmatter)
+  --ref-image <path>        Reference image(s)
   --ref-video <path>        Reference video
   --ref-audio <path>        Reference audio
   -m, --model <id>          Model ID
@@ -85,7 +86,6 @@ Options:
   --resolution <string>     Resolution preset
   --camera-fixed            Fixed camera position
   --watermark               Add watermark
-  --generate-audio          Generate audio
   --return-last-frame       Return last frame
   --service-tier <tier>     Service tier
   --draft                   Draft mode
@@ -118,7 +118,8 @@ Options: same as submit, plus:
 function parseArgs(argv: string[]): { command: string; args: CliArgs; taskId: string | null } {
   const out: CliArgs = {
     prompt: null,
-videoPath: null,
+    promptFile: null,
+    videoPath: null,
     imagePaths: [],
     videoPaths: [],
     audioPaths: [],
@@ -129,10 +130,9 @@ videoPath: null,
     fps: null,
     seed: null,
     aspectRatio: null,
-    resolution: null,
+    resolution: "720p",
     cameraFixed: false,
     watermark: false,
-    generateAudio: false,
     returnLastFrame: false,
     serviceTier: null,
     draft: false,
@@ -163,7 +163,6 @@ videoPath: null,
     if (a === "--json") { out.json = true; continue; }
     if (a === "--camera-fixed") { out.cameraFixed = true; continue; }
     if (a === "--watermark") { out.watermark = true; continue; }
-    if (a === "--generate-audio") { out.generateAudio = true; continue; }
     if (a === "--return-last-frame") { out.returnLastFrame = true; continue; }
     if (a === "--draft") { out.draft = true; continue; }
 
@@ -182,6 +181,13 @@ videoPath: null,
       continue;
     }
 
+    if (a === "--promptfile") {
+      const v = argv[++i];
+      if (!v) throw new Error("Missing value for --promptfile");
+      out.promptFile = v;
+      continue;
+    }
+
     if (a === "--video") {
       const v = argv[++i];
       if (!v) throw new Error("Missing value for --video");
@@ -189,9 +195,9 @@ videoPath: null,
       continue;
     }
 
-    if (a === "--image") {
+    if (a === "--ref-image") {
       const v = argv[++i];
-      if (!v) throw new Error("Missing value for --image");
+      if (!v) throw new Error("Missing value for --ref-image");
       out.imagePaths.push(v);
       continue;
     }
@@ -386,6 +392,7 @@ async function downloadVideo(url: string): Promise<Uint8Array> {
 
 async function doSubmit(args: CliArgs, provider: VideoProvider, config: EnvConfig): Promise<void> {
   let prompt: string | null = args.prompt;
+  if (!prompt && args.promptFile) prompt = await readPromptFromMarkdownFile(args.promptFile);
   if (!prompt) prompt = await readPromptFromStdin();
 
   if (!prompt) {
@@ -479,6 +486,7 @@ async function doDownload(taskId: string, args: CliArgs, provider: VideoProvider
 
 async function doRun(args: CliArgs, provider: VideoProvider, config: EnvConfig): Promise<void> {
   let prompt: string | null = args.prompt;
+  if (!prompt && args.promptFile) prompt = await readPromptFromMarkdownFile(args.promptFile);
   if (!prompt) prompt = await readPromptFromStdin();
 
   if (!prompt) {

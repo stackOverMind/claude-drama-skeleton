@@ -1,6 +1,6 @@
 export type Provider = "newapi";
 
-export type Quality = "normal" | "2k";
+export type Quality = "normal" | "1k" | "2k" | "3k";
 
 export type CliArgs = {
   prompt: string | null;

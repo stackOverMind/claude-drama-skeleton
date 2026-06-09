@@ -12,15 +12,15 @@ function printUsage(): void {
 
 Options:
   -p, --prompt <text>       Prompt text
-  --promptfiles <files...>  Read prompt from files (concatenated)
+  --promptfile <files...>   Read prompt from files (concatenated)
   --image <path>            Output image path (required)
   -m, --model <id>          Model ID (default: from .env)
   --ar <ratio>              Aspect ratio (e.g., 16:9, 1:1, 4:3)
   --size <WxH>              Size (e.g., 1024x1024)
-  --quality normal|2k       Quality preset (default: 2k)
+  --quality normal|1k|2k|3k    Quality preset (default: 2k)
   --ref <files...>          Reference images for image-to-image editing
   --n <count>               Number of images (default: 1)
-  --timeout <seconds>       Request timeout (default: 300)
+  --timeout <seconds>       Request timeout (default: 1200)
   --json                    JSON output
   -h, --help                Show help
 
@@ -42,7 +42,7 @@ function parseArgs(argv: string[]): CliArgs {
     quality: null,
     referenceImages: [],
     n: 1,
-    timeout: 300,
+    timeout: 1200,
     json: false,
     help: false,
     provider: null,
@@ -69,11 +69,11 @@ function parseArgs(argv: string[]): CliArgs {
       continue;
     }
 
-    if (a === "--promptfiles") {
+    if (a === "--promptfile") {
       const items: string[] = [];
       let j = i + 1;
       while (j < argv.length && !argv[j]!.startsWith("-")) { items.push(argv[j]!); j++; }
-      if (items.length === 0) throw new Error("Missing files for --promptfiles");
+      if (items.length === 0) throw new Error("Missing files for --promptfile");
       out.promptFiles.push(...items);
       i = j - 1;
       continue;
@@ -109,7 +109,7 @@ function parseArgs(argv: string[]): CliArgs {
 
     if (a === "--quality") {
       const v = argv[++i];
-      if (v !== "normal" && v !== "2k") throw new Error(`Invalid quality: ${v}`);
+      if (v !== "normal" && v !== "1k" && v !== "2k" && v !== "3k") throw new Error(`Invalid quality: ${v}`);
       out.quality = v;
       continue;
     }
@@ -212,24 +212,11 @@ async function main(): Promise<void> {
   }
 
   let imageData: Uint8Array;
-  let retried = false;
 
-  while (true) {
-    try {
-      if (args.referenceImages.length > 0) {
-        imageData = await provider.editImage(prompt, model, args, config);
-      } else {
-        imageData = await provider.generateImage(prompt, model, args, config);
-      }
-      break;
-    } catch (e) {
-      if (!retried) {
-        retried = true;
-        console.error("Generation failed, retrying...");
-        continue;
-      }
-      throw e;
-    }
+  if (args.referenceImages.length > 0) {
+    imageData = await provider.editImage(prompt, model, args, config);
+  } else {
+    imageData = await provider.generateImage(prompt, model, args, config);
   }
 
   const dir = path.dirname(outputPath);

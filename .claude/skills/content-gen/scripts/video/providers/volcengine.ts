@@ -119,7 +119,7 @@ async function submitTask(
   if (args.aspectRatio) body.ratio = args.aspectRatio;
   if (args.cameraFixed) body.camera_fixed = true;
   if (args.watermark) body.watermark = true;
-  if (args.generateAudio) body.generate_audio = true;
+  body.generate_audio = true;
   if (args.returnLastFrame) body.return_last_frame = true;
   if (args.serviceTier) body.service_tier = args.serviceTier;
   if (args.draft) body.draft = true;

@@ -2,6 +2,7 @@ export type Provider = "volcengine" | "newapi";
 
 export type CliArgs = {
   prompt: string | null;
+  promptFile: string | null;
   videoPath: string | null;
   imagePaths: string[];
   videoPaths: string[];
@@ -16,7 +17,6 @@ export type CliArgs = {
   resolution: string | null;
   cameraFixed: boolean;
   watermark: boolean;
-  generateAudio: boolean;
   returnLastFrame: boolean;
   serviceTier: string | null;
   draft: boolean;

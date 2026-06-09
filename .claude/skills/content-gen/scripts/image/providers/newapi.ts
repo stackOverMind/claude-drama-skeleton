@@ -29,7 +29,7 @@ function roundToMultipleOf16(n: number): number {
 }
 
 function getSizeFromAspectRatio(ar: string | null, quality: CliArgs["quality"]): string {
-  const baseSize = quality === "2k" ? 2048 : 1024;
+  const baseSize = quality === "3k" ? 3072 : quality === "2k" ? 2048 : 1024;
 
   if (!ar) return `${baseSize}x${baseSize}`;
 

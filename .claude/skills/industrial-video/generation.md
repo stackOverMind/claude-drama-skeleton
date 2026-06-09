@@ -6,7 +6,7 @@
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
-  --promptfiles <提示词文件.md> \
+  --promptfile <提示词文件.md> \
   --image <输出路径.png> \
   [选项]
 ```
@@ -15,8 +15,8 @@ npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
 
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
-| `--prompt <text>`, `-p` | 直接传入 prompt 文本（与 --promptfiles 二选一） | - |
-| `--promptfiles <files...>` | 从文件读取 prompt（多个文件会拼接） | - |
+| `--prompt <text>`, `-p` | 直接传入 prompt 文本（与 --promptfile 二选一） | - |
+| `--promptfile <files...>` | 从文件读取 prompt（多个文件会拼接） | - |
 | `--image <path>` | 输出图片路径（**必须**） | - |
 | `-m, --model <id>` | 模型 ID | 从 `.env` 读取 |
 | `--ar <ratio>` | 宽高比：`16:9`、`1:1`、`4:3`、`9:16` | 1:1 |
@@ -47,7 +47,7 @@ npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
-  --promptfiles 项目-视频-日漫女孩/2-素材/角色/Yi/人物参考-Yi-运动服.md \
+  --promptfile 项目-视频-日漫女孩/2-素材/角色/Yi/人物参考-Yi-运动服.md \
   --image 项目-视频-日漫女孩/2-素材/角色/Yi/人物参考-Yi-运动服.png \
   --ar 1:1 --quality 2k
 ```
@@ -56,7 +56,7 @@ npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
-  --promptfiles 项目-视频-日漫女孩/2-素材/场景/日本街道/场景参考-日本街道-白天.md \
+  --promptfile 项目-视频-日漫女孩/2-素材/场景/日本街道/场景参考-日本街道-白天.md \
   --image 项目-视频-日漫女孩/2-素材/场景/日本街道/场景参考-日本街道-白天.png \
   --ar 1:1 --quality 2k
 ```
@@ -65,7 +65,7 @@ npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
-  --promptfiles 项目-视频-日漫女孩/3-关键帧/关键帧-街头行走-v1.md \
+  --promptfile 项目-视频-日漫女孩/3-关键帧/关键帧-街头行走-v1.md \
   --image 项目-视频-日漫女孩/3-关键帧/关键帧-街头行走-v1.png \
   --ref 项目-视频-日漫女孩/2-素材/角色/Yi/人物参考-Yi-运动服.png \
   --ar 16:9 --quality 2k
@@ -75,7 +75,7 @@ npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
-  --promptfiles 项目-视频-日漫女孩/3-关键帧/关键帧-Yi滑板动作-九宫格.md \
+  --promptfile 项目-视频-日漫女孩/3-关键帧/关键帧-Yi滑板动作-九宫格.md \
   --image 项目-视频-日漫女孩/3-关键帧/关键帧-Yi滑板动作-九宫格.png \
   --ref 项目-视频-日漫女孩/2-素材/角色/Yi/人物参考-Yi-运动服.png \
   --ar 1:1 --quality 2k
@@ -105,7 +105,7 @@ npx -y bun .claude/skills/content-gen/scripts/image/main.ts \
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/video/main.ts \
-  --promptfiles <提示词文件.md> \
+  --promptfile <提示词文件.md> \
   --video <输出路径.mp4> \
   [选项]
 ```
@@ -115,7 +115,7 @@ npx -y bun .claude/skills/content-gen/scripts/video/main.ts \
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
 | `--prompt <text>`, `-p` | 直接传入 prompt 文本 | - |
-| `--promptfiles <files...>` | 从文件读取 prompt | - |
+| `--promptfile <files...>` | 从文件读取 prompt | - |
 | `--video <path>` | 输出视频路径（**必须**） | - |
 | `--ref <files...>` | 参考图片/视频路径 | - |
 | `--ar <ratio>` | 宽高比：`16:9`、`9:16`、`1:1` | - |
@@ -142,7 +142,7 @@ npx -y bun .claude/skills/content-gen/scripts/video/main.ts \
 
 ```bash
 npx -y bun .claude/skills/content-gen/scripts/video/main.ts \
-  --promptfiles 项目-视频-日漫女孩/4-视频/视频-街头行走.md \
+  --promptfile 项目-视频-日漫女孩/4-视频/视频-街头行走.md \
   --video 项目-视频-日漫女孩/4-视频/视频-街头行走.mp4 \
   --ref 项目-视频-日漫女孩/3-关键帧/关键帧-街头行走-v1.png \
   --ar 16:9 --duration 5

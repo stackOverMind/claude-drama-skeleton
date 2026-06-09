@@ -29,10 +29,10 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "风景画" --image lands
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "把猫变成赛博朋克风格" --image cyber-cat.png --ref cat.png
 
 # High quality
-npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.png --quality 2k
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.png --quality normal
 
 # From prompt files
-npx -y bun ${SKILL_DIR}/scripts/image/main.ts --promptfiles system.md content.md --image out.png
+npx -y bun ${SKILL_DIR}/scripts/image/main.ts --promptfile system.md content.md --image out.png
 
 # JSON output
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.png --json
@@ -43,7 +43,7 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.p
 | Option | Description |
 |--------|-------------|
 | `--prompt <text>`, `-p` | Prompt text |
-| `--promptfiles <files...>` | Read prompt from files (concatenated) |
+| `--promptfile <files...>` | Read prompt from files (concatenated) |
 | `--image <path>` | Output image path (required) |
 | `-m, --model <id>` | Model ID (default: from `.env`) |
 | `--ar <ratio>` | Aspect ratio (e.g., `16:9`, `1:1`, `4:3`) |
@@ -64,7 +64,7 @@ npx -y bun ${SKILL_DIR}/scripts/image/main.ts --prompt "一只猫" --image out.p
 # 1. 生成九宫格大图
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
   --prompt "Create a 3x3 character reference sheet. Grid layout: Row 1: Front view | Side view | Back view. Row 2: Happy | Angry | Sad. Row 3: Surprised | Neutral | Action. Character: a young female warrior with long silver hair, wearing red armor. Style: anime, clean white background, full body in each cell, consistent outfit." \
-  --image 角色/主角/参考图.png --ar 1:1 --quality 2k
+  --image 角色/主角/参考图.png --ar 1:1 --quality normal
 
 # 2. 自动切割为 9 张独立图片
 npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split 角色/主角/参考图.png 角色/主角/ --grid 3x3 --prefix 主角
@@ -77,7 +77,7 @@ npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split 角色/主角/参考图.png 
 # 1. 生成四宫格大图
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
   --prompt "Create a 2x2 grid. Row 1: Day view | Night view. Row 2: Wide shot | Close-up. Scene: a medieval castle on a hill. Style: fantasy art, consistent architecture across all cells." \
-  --image 场景/城堡/参考图.png --ar 1:1 --quality 2k
+  --image 场景/城堡/参考图.png --ar 1:1 --quality normal
 
 # 2. 自动切割为 4 张独立图片
 npx -y bun ${SKILL_DIR}/scripts/image/grid.ts split 场景/城堡/参考图.png 场景/城堡/ --grid 2x2 --prefix 城堡
@@ -154,6 +154,15 @@ npm install sharp
 **Default**: Sequential generation (one image at a time).
 
 **Parallel**: Only use when user explicitly requests parallel generation. Launch multiple subagents with `run_in_background=true`.
+
+## 关键规则：永远不要覆盖已有输出文件
+
+**生成任何内容时，绝不要覆盖已存在的输出文件。** 如果目标路径已存在，**自动追加版本号**（如 `-v2`、`-v3`），不要删除旧文件。
+
+- 示例：`故事板-Chico.png` 已存在 → 新文件自动命名为 `故事板-Chico-v2.png`
+- 示例：`Chico-快拔初生犊.mp4` 已存在 → 新文件自动命名为 `Chico-快拔初生犊-v2.mp4`
+
+**不要在生成前询问用户是否覆盖，直接自动改名即可。** 同时告知用户新文件路径。
 
 ## 关键规则：永远不要覆盖参考文件
 
@@ -240,16 +249,16 @@ Prompt 文件中指代参考图时，**必须按 `--ref` 参数中的提交顺�
 ```bash
 # 文生图
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
-  --promptfiles prompt.md \
+  --promptfile prompt.md \
   --image output.png \
-  --ar 16:9 --quality 2k
+  --ar 16:9 --quality normal
 
 # 图生图
 npx -y bun ${SKILL_DIR}/scripts/image/main.ts \
-  --promptfiles prompt.md \
+  --promptfile prompt.md \
   --image output.png \
   --ref ref1.png ref2.png \
-  --ar 16:9 --quality 2k
+  --ar 16:9 --quality normal
 ```
 
 ## Error Handling

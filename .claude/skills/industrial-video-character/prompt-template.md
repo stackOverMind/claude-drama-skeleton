@@ -1,6 +1,17 @@
 # 角色生成提示词模板
 
 ```markdown
+---
+model: gpt-image-2
+ratio: "16:9"
+resolution: 1k
+ref-images:
+  - 项目-xxx/2-素材/角色/{角色名}/面部特写.png
+seed: null
+status: null
+task_id: null
+---
+
 # 人物参考-{角色名}-{特征} Prompt
 
 ## 参考图
@@ -31,10 +42,6 @@
 
 均匀柔和的光线，正面光源，无强烈阴影，全身入镜
 
-## 完整提示词
-
-{将以上各层合并}
-
 ## 负面 Prompt
 
 低质量，变形，多余肢体，手指畸形，模糊，水印，文字，签名，灰暗色调，过度曝光，阴影过硬，面部崩坏，五官不对称，比例失调，背景杂乱，噪点，油画质感，西方卡通风格，3D游戏塑料感，渲染过度
@@ -43,6 +50,17 @@
 ## 示例
 
 ```markdown
+---
+model: gpt-image-2
+ratio: "16:9"
+resolution: 1k
+ref-images:
+  - 项目-xxx/2-素材/角色/Yi/面部特写.png
+seed: null
+status: null
+task_id: null
+---
+
 # 人物参考-Yi-运动服 Prompt
 
 ## 参考图

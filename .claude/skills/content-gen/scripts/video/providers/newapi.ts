@@ -43,10 +43,20 @@ function buildConfig(): EnvConfig {
 }
 
 async function buildMediaContent(
+  imagePaths: string[],
   videoPaths: string[],
   audioPaths: string[],
 ): Promise<ContentItem[]> {
   const content: ContentItem[] = [];
+
+  for (const imgPath of imagePaths) {
+    const url = await resolveMediaUrl(imgPath);
+    content.push({
+      type: "image_url",
+      image_url: { url },
+      role: "reference_image",
+    });
+  }
 
   for (const vidPath of videoPaths) {
     const url = await resolveMediaUrl(vidPath);
@@ -82,9 +92,6 @@ async function submitTask(
     prompt,
   };
 
-  if (args.imagePaths.length > 0) {
-    body.image = await resolveMediaUrl(args.imagePaths[0]);
-  }
   if (args.duration !== null) body.seconds = String(args.duration);
   if (args.width !== null) body.width = args.width;
   if (args.height !== null) body.height = args.height;
@@ -97,13 +104,13 @@ async function submitTask(
   if (args.aspectRatio) metadata.ratio = args.aspectRatio;
   if (args.cameraFixed) metadata.camera_fixed = true;
   if (args.watermark) metadata.watermark = true;
-  if (args.generateAudio) metadata.generate_audio = true;
+  metadata.generate_audio = true;
   if (args.returnLastFrame) metadata.return_last_frame = true;
   if (args.serviceTier) metadata.service_tier = args.serviceTier;
   if (args.draft) metadata.draft = true;
   if (args.frames !== null) metadata.frames = args.frames;
 
-  const mediaContent = await buildMediaContent(args.videoPaths, args.audioPaths);
+  const mediaContent = await buildMediaContent(args.imagePaths, args.videoPaths, args.audioPaths);
   if (mediaContent.length > 0) {
     metadata.content = mediaContent;
   }

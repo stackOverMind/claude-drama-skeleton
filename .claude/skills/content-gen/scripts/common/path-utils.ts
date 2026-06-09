@@ -1,6 +1,7 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { getMimeType } from "./mime";
+import { hasOssCredentials, uploadToOss } from "./oss-upload";
 
 export function normalizeOutputPath(p: string, defaultExt: string): string {
   const full = path.resolve(p);
@@ -23,5 +24,9 @@ export async function fileToDataUrl(filePath: string): Promise<string> {
 
 export async function resolveMediaUrl(filePath: string): Promise<string> {
   if (isUrl(filePath)) return filePath;
+  if (hasOssCredentials()) {
+    console.log(`Uploading to OSS: ${filePath}`);
+    return await uploadToOss(filePath);
+  }
   return fileToDataUrl(filePath);
 }

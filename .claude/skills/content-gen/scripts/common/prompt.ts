@@ -19,3 +19,17 @@ export async function readPromptFromStdin(): Promise<string | null> {
     return null;
   }
 }
+
+export async function readPromptFromMarkdownFile(filePath: string): Promise<string> {
+  const content = await readFile(filePath, "utf8");
+  let body = content;
+
+  if (content.startsWith("---\n")) {
+    const endIdx = content.indexOf("\n---", 4);
+    if (endIdx !== -1) {
+      body = content.slice(endIdx + 4);
+    }
+  }
+
+  return body.replace(/^\s+/, "");
+}
